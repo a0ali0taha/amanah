@@ -1,0 +1,29 @@
+{
+  "source": "<sample>",
+  "model": "qwen2.5:7b",
+  "total_scenes": 3,
+  "flagged_count": 2,
+  "flagged": [
+    {
+      "scene_number": 2,
+      "start": "00:00:20.000",
+      "end": "00:00:30.000",
+      "text_preview": "That girl has a hot body, shake it baby! Let's go find the treasure map.",
+      "safe": false,
+      "reason": "Immodest body-focused lines.",
+      "raw_response": "{\"safe\": false, \"reason\": \"Immodest body-focused lines.\"}",
+      "parse_error": null
+    },
+    {
+      "scene_number": 3,
+      "start": "00:00:40.000",
+      "end": "00:00:50.000",
+      "text_preview": "Damn it, get your damn hands off me, you bastard! We should rest and eat some fruit.",
+      "safe": false,
+      "reason": "Vulgar language and crude insults.",
+      "raw_response": "{\"safe\": false, \"reason\": \"Vulgar language and crude insults.\"}",
+      "parse_error": null
+    }
+  ],
+  "errors": []
+}

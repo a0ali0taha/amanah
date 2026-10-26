@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amanah"
+version = "0.1.0"
+description = "Local family-film cleaner: transcribe dialogue, review scenes, and write a cut version."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Ahmed Ali Taha", email = "a.ali.taha@gmail.com" }]
+dependencies = ["mlx-whisper>=0.4.3"]
+
+[project.scripts]
+amanah = "amanah:main"
+
+[tool.setuptools]
+py-modules = [
+  "amanah",
+  "analyze_transcript",
+  "remove_unsafe_scenes",
+  "transcribe_audio",
+]
