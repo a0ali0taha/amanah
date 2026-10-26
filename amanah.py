@@ -2,7 +2,7 @@
 """Amanah: local family-film cleaner.
 
 Takes a video you already have and writes a shorter cut by:
-  1. Transcribing English dialogue (mlx-whisper)
+  1. Transcribing English dialogue (mlx-whisper on Mac, faster-whisper on Windows)
   2. Reviewing scenes for content unsuitable for children (Ollama)
   3. Removing flagged scenes with ffmpeg
 
@@ -21,18 +21,20 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from transcribe_audio import DEFAULT_MODEL, WHISPER_ENGINE, project_venv_python
+
 
 ROOT = Path(__file__).resolve().parent
-VENV_PYTHON = ROOT / ".venv" / "bin" / "python"
 TRANSCRIBE_SCRIPT = ROOT / "transcribe_audio.py"
 ANALYZE_SCRIPT = ROOT / "analyze_transcript.py"
 REMOVE_SCRIPT = ROOT / "remove_unsafe_scenes.py"
 
 
 def resolve_python_for_transcribe() -> Path:
-    """Prefer project venv for mlx-whisper."""
-    if VENV_PYTHON.is_file():
-        return VENV_PYTHON
+    """Prefer the project virtual environment, where the speech engine is installed."""
+    venv_python = project_venv_python()
+    if venv_python.is_file():
+        return venv_python
     return Path(sys.executable)
 
 
@@ -97,8 +99,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--whisper-model",
-        default="mlx-community/whisper-small-mlx",
-        help="mlx-whisper model (default: mlx-community/whisper-small-mlx)",
+        default=DEFAULT_MODEL,
+        help=f"{WHISPER_ENGINE} model (default: {DEFAULT_MODEL})",
     )
     parser.add_argument(
         "--llm-model",
@@ -188,7 +190,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(f"SRT     : {srt_path}")
     print(f"Report  : {report_path}")
     print(f"Output  : {output}")
-    print(f"Whisper : {args.whisper_model}")
+    print(f"Whisper : {WHISPER_ENGINE} ({args.whisper_model})")
     print(f"LLM     : {args.llm_model}")
 
     pipeline_started = time.time()

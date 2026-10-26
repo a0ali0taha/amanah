@@ -19,8 +19,30 @@ from pathlib import Path
 from typing import Any, Optional
 
 
-DEFAULT_MODEL = "mlx-community/whisper-small-mlx"
+MLX_MODEL = "mlx-community/whisper-small-mlx"
+FASTER_WHISPER_MODEL = "small"
 DEFAULT_LANGUAGE = "en"
+
+
+def uses_faster_whisper() -> bool:
+    """Windows uses faster-whisper. macOS keeps mlx-whisper."""
+    return sys.platform == "win32"
+
+
+WHISPER_ENGINE = "faster-whisper" if uses_faster_whisper() else "mlx-whisper"
+DEFAULT_MODEL = FASTER_WHISPER_MODEL if uses_faster_whisper() else MLX_MODEL
+
+
+def project_venv_python() -> Path:
+    """Python inside the project virtual environment, for this operating system."""
+    root = Path(__file__).resolve().parent
+    if sys.platform == "win32":
+        return root / ".venv" / "Scripts" / "python.exe"
+    return root / ".venv" / "bin" / "python"
+
+
+def _engine_module_name() -> str:
+    return "faster_whisper" if uses_faster_whisper() else "mlx_whisper"
 
 
 @dataclass(frozen=True)
@@ -57,17 +79,33 @@ def cues_to_text(cues: list[Cue]) -> str:
     return "\n".join(cue.text for cue in cues) + ("\n" if cues else "")
 
 
+def engine_is_installed() -> bool:
+    try:
+        __import__(_engine_module_name())
+    except ImportError:
+        return False
+    return True
+
+
+def install_hint() -> str:
+    if sys.platform == "win32":
+        return (
+            "py -3 -m venv .venv\n"
+            "  .venv\\Scripts\\python -m pip install -r requirements.txt"
+        )
+    return "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+
+
 def reexec_project_venv_if_needed() -> None:
-    """Run again with the project venv when mlx-whisper is installed there."""
+    """Run again with the project venv when the speech engine is installed there."""
     if os.environ.get("AMANAH_TRANSCRIBE_REEXEC") == "1":
         return
-    try:
-        import mlx_whisper  # noqa: F401
-    except ImportError:
-        venv_python = Path(__file__).resolve().parent / ".venv" / "bin" / "python"
-        if venv_python.is_file():
-            os.environ["AMANAH_TRANSCRIBE_REEXEC"] = "1"
-            os.execv(str(venv_python), [str(venv_python), *sys.argv])
+    if engine_is_installed():
+        return
+    venv_python = project_venv_python()
+    if venv_python.is_file():
+        os.environ["AMANAH_TRANSCRIBE_REEXEC"] = "1"
+        os.execv(str(venv_python), [str(venv_python), *sys.argv])
 
 
 def extract_wav(
@@ -108,7 +146,18 @@ def extract_wav(
 
 
 def transcribe_english(wav_path: Path, model: str, *, verbose: bool) -> dict[str, Any]:
-    """Transcribe English speech. task is transcribe, never translate."""
+    """Transcribe English speech. The task is transcribe, never translate."""
+    try:
+        if uses_faster_whisper():
+            return _transcribe_faster(wav_path, model, verbose=verbose)
+        return _transcribe_mlx(wav_path, model, verbose=verbose)
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"Transcription failed: {exc}") from exc
+
+
+def _transcribe_mlx(wav_path: Path, model: str, *, verbose: bool) -> dict[str, Any]:
     import mlx_whisper
 
     return mlx_whisper.transcribe(
@@ -120,6 +169,26 @@ def transcribe_english(wav_path: Path, model: str, *, verbose: bool) -> dict[str
         condition_on_previous_text=True,
         initial_prompt="English dialogue.",
     )
+
+
+def _transcribe_faster(wav_path: Path, model: str, *, verbose: bool) -> dict[str, Any]:
+    from faster_whisper import WhisperModel
+
+    whisper = WhisperModel(model, device="auto", compute_type="default")
+    segments, info = whisper.transcribe(
+        str(wav_path),
+        language=DEFAULT_LANGUAGE,
+        task="transcribe",
+        condition_on_previous_text=True,
+        initial_prompt="English dialogue.",
+    )
+    collected: list[dict[str, Any]] = []
+    for segment in segments:
+        text = segment.text
+        if verbose:
+            print(f"[{segment.start:.2f} -> {segment.end:.2f}] {text.strip()}")
+        collected.append({"start": segment.start, "end": segment.end, "text": text})
+    return {"language": info.language, "segments": collected}
 
 
 def segments_to_cues(result: dict[str, Any], time_offset: float) -> list[Cue]:
@@ -171,7 +240,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         default=DEFAULT_MODEL,
-        help=f"mlx-whisper model repo or local path (default: {DEFAULT_MODEL})",
+        help=f"{WHISPER_ENGINE} model (default: {DEFAULT_MODEL})",
     )
     parser.add_argument(
         "--start",
@@ -206,12 +275,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("Error: --end must be greater than --start", file=sys.stderr)
         return 1
 
-    try:
-        import mlx_whisper  # noqa: F401
-    except ImportError:
+    if not engine_is_installed():
         print(
-            "Error: mlx-whisper is not installed.\n"
-            "  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+            f"Error: {WHISPER_ENGINE} is not installed.\n"
+            f"  {install_hint()}",
             file=sys.stderr,
         )
         return 1
@@ -220,7 +287,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     offset = args.start or 0.0
 
     print(f"Source    : {source}")
-    print(f"Language  : English transcription (not a translation)")
+    print("Language  : English transcription")
+    print(f"Engine    : {WHISPER_ENGINE}")
     print(f"Model     : {args.model}")
     print(f"SRT       : {output}")
 
