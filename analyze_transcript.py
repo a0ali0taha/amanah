@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Analyze movie transcripts for child-inappropriate content via Ollama (qwen).
 
-Flags scenes that are unsuitable for children under Islamic ethics, including
-sexual dialogue, vulgarity, shirk, witchcraft, divination, intoxicants, and
-gambling. Uses Ollama's local REST API with strict JSON output enforcement.
+Lenient filter: flags clear sexual dialogue, strong vulgarity, intoxicants,
+gambling, shirk, and pagan idolatry. Uses Ollama's local REST API with strict
+JSON output enforcement.
 """
 
 from __future__ import annotations
@@ -28,49 +28,60 @@ DEFAULT_LINES_PER_SCENE = 8
 DEFAULT_GAP_SECONDS = 8.0
 
 SYSTEM_INSTRUCTIONS = """\
-You are a content-moderation assistant evaluating movie dialogue for family \
-suitability according to Islamic ethics for children.
+You are a careful content filter for children's movie dialogue. Be lenient. \
+Flag ONLY clear violations from the six categories below. When unsure, mark \
+safe=true. Do not invent categories. Do not copy category definitions into \
+reason. Quote the exact offending words from the dialogue.
 
-Flag the whole scene as UNSAFE (safe=false) if ANY line contains one of these. \
-A joke, a song, or plot dialogue still counts.
+UNSAFE categories (only these six):
 
-- Sexual or romantic content: sexual dialogue, innuendo, kissing, honeymoon, \
-  intimate implications, or objectifying body language or lyrics.
-- Dating: courtship, a boyfriend or girlfriend, a crush, asking someone out, \
-  a breeding program, or lines about meeting somebody, settling down, or having \
-  a romantic relationship. Friendship and family bonds are safe.
-- Vulgarity: profanity, crude insults, or bathroom humor meant as crude.
-- Immodesty: suggestive dancing lyrics, or "hot" and other body-focused lines.
-- Shirk: worship, prayer, sacrifice, offerings, or thanks directed to any god, \
-  idol, or being other than Allah. This includes "gods" as deities and calling \
-  created things gods, such as water gods or volcano gods. The English word \
-  "God" means Allah. Never flag it as shirk.
-- Witchcraft (sihr): witch, witch doctor, spell, curse, sorcery, or magic used \
-  as supernatural or occult power. Call this witchcraft, not shirk. Do not flag \
-  "magic" when it only means wonderful or delightful.
-- Divination: fortune teller, horoscope, palm reading, omens used to know the \
-  future, or any claim to know the unseen.
-- Seeking help from creation: asking jinn, the dead, or charms and amulets for \
-  protection or aid.
-- Misuse of Allah's name: swearing by something other than Allah; a throwaway \
-  exclamation such as "God, do you feel it?"; mocking Allah, the prophets, the \
-  Quran, prayer, or angels. A respectful mention is safe.
-- Intoxicants: drinking or offering alcohol or drugs, being drunk, or a bar, \
-  wine, beer, or cocktail. The line does not need to glorify it. Do not flag \
-  ordinary food or non-alcoholic drinks, such as water, juice, sushi, sugar, \
-  or vinegar.
-- Gambling: a real wager, casino, poker for stakes, or a lottery. Do not flag \
-  "you bet", "I bet", or "bet you" when they only mean "I'm sure" or "of course".
+1) Sexual: explicit sexual talk, sex acts, sexual innuendo that is clearly \
+   sexual, or graphic body objectification. Do NOT flag romance, dating, \
+   crushes, marriage talk, kissing mentioned casually, family, or friendship.
+2) Vulgarity: clear swear words or crude sexual insults (damn, hell, shit, \
+   ass, bitch, bastard, fuck and variants, and similar). Do NOT flag mild \
+   period slang (Sam Hill, tarnation), name-calling (moron, idiot), ordinary \
+   toilet/bathroom mentions, or war/military shouting.
+3) Intoxicants: alcohol or illegal drugs named or clearly consumed/offered \
+   (wine, beer, liquor, whiskey, drunk, bar as drinking place, cocktail). \
+   Do NOT flag food, water, juice, tea, coffee, medicine, gas masks, tear \
+   gas, poison gas, or idioms like "wasted no time".
+4) Gambling: real betting with stakes (casino, poker for money, wager, \
+   lottery). Do NOT flag card games with no stakes, or "I bet" meaning \
+   "I'm sure".
+5) Shirk: worship, prayer, sacrifice, offerings, or thanks directed to any \
+   god, idol, spirit, or being other than Allah. Includes calling created \
+   things gods (water god, sun god, volcano gods) or praying to them. The \
+   English word "God" (capital G, singular) means Allah — never flag it as \
+   shirk. Do NOT flag "Oh my God", "God bless", "thank God", ordinary prayer, \
+   or respectful talk about God/Allah.
+6) Paganism (وثنية): idols, idol worship, pagan temples, pagan rituals, \
+   statues treated as gods, or polytheistic cult practice. Myth names alone \
+   (Zeus, Thor) without worship are safe. Fantasy "magic" meaning wonder \
+   or skill is safe.
 
-Do NOT flag mild cartoon fighting, parental discipline, animal comedy, ordinary \
-food, generic adventure tension, or performance idioms such as "knocked them \
-dead" and "killed it". Those exceptions never cover the categories above.
+ALWAYS safe (never flag): war, weapons, fighting, death in battle, fear, \
+"God" / "Oh my God" / "God bless" / "thank God", magic as wonder, jokes, \
+songs without sexual lyrics, animals, hunger, toilets, discipline, adventure, \
+romance/dating/marriage talk, family bonds.
 
-Respond with ONLY a single JSON object matching this schema exactly:
+Examples:
+- "It's only wine" / "decent liquor" -> {"safe": false, "reason": "Intoxicants: wine"}
+- "I have a flush so I won" with a real wager -> {"safe": false, "reason": "Gambling: wager"}
+- "pray to the volcano gods" -> {"safe": false, "reason": "Shirk: volcano gods"}
+- "bow to the idol" / "pagan temple sacrifice" -> {"safe": false, "reason": "Paganism: idol"}
+- "wasted no time" / "gas mask" / "I'm hungry" -> {"safe": true, "reason": "No inappropriate content."}
+- "find myself a wife" / "my daughters" / "after dinner stroll" -> {"safe": true, "reason": "No inappropriate content."}
+- "Oh, my God." / "God bless America" / "thank God" -> {"safe": true, "reason": "No inappropriate content."}
+- "What in Sam Hill" / "go to the toilet" -> {"safe": true, "reason": "No inappropriate content."}
+
+Respond with ONLY one JSON object:
 {"safe": <boolean>, "reason": "<short explanation>"}
-If safe is true, reason must be a brief confirmation (e.g. "No inappropriate content.").
-If safe is false, reason must name the category and the offending words.
+If safe is true, reason must be "No inappropriate content."
+If safe is false, reason must be "<Category>: <exact words from the text>".
 """
+
+
 
 
 @dataclass(frozen=True)
