@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Amanah</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="arabic">أمانة</p>
+      <h1>Amanah</h1>
+      <p class="lede">Transcribe the dialogue, review each scene, and write a shorter cut. The film stays on this machine.</p>
+      <p id="health" class="health">Checking this machine…</p>
+    </header>
+
+    <section class="panel">
+      <label for="video">Film</label>
+      <div class="row">
+        <input id="video" type="text" placeholder="/path/to/film.mp4" autocomplete="off" spellcheck="false">
+        <button id="pick" type="button">Choose</button>
+      </div>
+
+      <label for="model">Review model</label>
+      <input id="model" type="text" value="qwen2.5:7b" autocomplete="off" spellcheck="false">
+
+      <label class="check">
+        <input id="skip-cut" type="checkbox">
+        Review only. Do not cut the video.
+      </label>
+
+      <button id="run" type="button">Clean this film</button>
+      <p id="message" class="message" hidden></p>
+    </section>
+
+    <section id="progress" class="panel" hidden>
+      <ol class="steps">
+        <li data-step="transcribe">Transcribe</li>
+        <li data-step="analyze">Review</li>
+        <li data-step="cut">Cut</li>
+      </ol>
+      <pre id="log"></pre>
+    </section>
+
+    <section id="result" class="panel" hidden>
+      <h2>Review</h2>
+      <p id="summary"></p>
+      <ul id="flagged"></ul>
+      <p id="output"></p>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

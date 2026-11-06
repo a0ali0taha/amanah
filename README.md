@@ -87,6 +87,14 @@ Useful flags:
 | `--pad 0.25` | Extra seconds removed around each flagged scene |
 | `-o path.mp4` | Where to write the cleaned video |
 
+## Interface
+
+```bash
+python3 ui_server.py
+```
+
+Opens http://127.0.0.1:8741. Choose a film, then run the same three steps. Tick “Review only” to stop after the report.
+
 ## Run one step
 
 ```bash

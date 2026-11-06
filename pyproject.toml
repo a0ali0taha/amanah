@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 amanah = "amanah:main"
+amanah-ui = "ui_server:main"
 
 [tool.setuptools]
 py-modules = [
@@ -23,4 +24,5 @@ py-modules = [
   "analyze_transcript",
   "remove_unsafe_scenes",
   "transcribe_audio",
+  "ui_server",
 ]
